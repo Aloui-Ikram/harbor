@@ -105,7 +105,7 @@ jobs:
           uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
           uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
           echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
-          # This is a test to re-trigger the workflow
+
           publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
       - name: Install Cosign
         uses: sigstore/cosign-installer@main
@@ -125,3 +125,4 @@ jobs:
           cosign sign-blob --oidc-provider=github "${{ env.harbor_online_build_bundle }}"
         env:
           COSIGN_EXPERIMENTAL: 1
+          
