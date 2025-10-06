@@ -7,7 +7,10 @@ on:
     branches:
       - main
       - release-*
-
+permissions:  # new workflow
+  id-token: write
+  contents: read
+  packages: write
 jobs:
   BUILD_PACKAGE:
     env:
@@ -104,3 +107,21 @@ jobs:
           echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
 
           publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@main
+      - name: Sign the Offline Installer Package
+        run: |
+         echo "Signing ${{ env.harbor_offline_build_bundle }}..."
+          # Note: We must also cd into the correct directory first!
+          cd src/github.com/goharbor/harbor
+          cosign sign-blob --oidc-provider=github "${{ env.harbor_offline_build_bundle }}"
+        env:
+          COSIGN_EXPERIMENTAL: 1
+      - name: Sign the Online Installer Package
+        run: |
+          echo "Signing ${{ env.harbor_online_build_bundle }}..."
+          # Note: We must also cd into the correct directory first!
+          cd src/github.com/goharbor/harbor
+          cosign sign-blob --oidc-provider=github "${{ env.harbor_online_build_bundle }}"
+        env:
+          COSIGN_EXPERIMENTAL: 1
