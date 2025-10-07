@@ -114,7 +114,7 @@ jobs:
          echo "Signing ${{ env.harbor_offline_build_bundle }}..."
           # Note: We must also cd into the correct directory first!
           cd src/github.com/goharbor/harbor
-          cosign sign-blob --oidc-provider=github "${{ env.harbor_offline_build_bundle }}"
+          cosign sign-blob --yes --oidc-provider=github "${{ env.harbor_offline_build_bundle }}"
         env:
           COSIGN_EXPERIMENTAL: 1
       - name: Sign the Online Installer Package
@@ -122,7 +122,7 @@ jobs:
           echo "Signing ${{ env.harbor_online_build_bundle }}..."
           # Note: We must also cd into the correct directory first!
           cd src/github.com/goharbor/harbor
-          cosign sign-blob --oidc-provider=github "${{ env.harbor_online_build_bundle }}"
+          cosign sign-blob --yes --oidc-provider=github "${{ env.harbor_online_build_bundle }}"
         env:
           COSIGN_EXPERIMENTAL: 1
           
