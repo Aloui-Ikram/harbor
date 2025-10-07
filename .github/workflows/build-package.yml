@@ -53,6 +53,7 @@ jobs:
         #  set -x
        #   echo "BUILD_BASE=true" >> $GITHUB_ENV
       - name: Build Package
+        id: build 
         run: |
           set -x
           env
@@ -105,7 +106,8 @@ jobs:
           #uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
           #uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
           echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
-
+          echo "offline_bundle=${harbor_offline_build_bundle}" >> $GITHUB_OUTPUT
+          echo "online_bundle=${harbor_online_build_bundle}" >> $GITHUB_OUTPUT
          # publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
       - name: Install Cosign
         uses: sigstore/cosign-installer@main
@@ -114,7 +116,7 @@ jobs:
          echo "Signing ${{ env.harbor_offline_build_bundle }}..."
           # Note: We must also cd into the correct directory first!
           cd src/github.com/goharbor/harbor
-          cosign sign-blob --yes --oidc-provider=github "${{ env.harbor_offline_build_bundle }}"
+          cosign sign-blob --yes --oidc-provider=github "${{ steps.build.outputs.offline_bundle }}"
         env:
           COSIGN_EXPERIMENTAL: 1
       - name: Sign the Online Installer Package
@@ -122,7 +124,7 @@ jobs:
           echo "Signing ${{ env.harbor_online_build_bundle }}..."
           # Note: We must also cd into the correct directory first!
           cd src/github.com/goharbor/harbor
-          cosign sign-blob --yes --oidc-provider=github "${{ env.harbor_online_build_bundle }}"
+          cosign sign-blob --yes --oidc-provider=github "${{ steps.build.outputs.online_bundle }}"
         env:
           COSIGN_EXPERIMENTAL: 1
           
