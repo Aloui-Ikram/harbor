@@ -127,7 +127,14 @@ jobs:
           cosign sign-blob --yes --oidc-provider=github "${{ steps.build.outputs.online_bundle }}"
         env:
           COSIGN_EXPERIMENTAL: 1
-          
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: harbor-packages
+          path: |
+              src/github.com/goharbor/harbor/*.tgz
+              src/github.com/goharbor/harbor/*.sig
+              src/github.com/goharbor/harbor/*.crt         
 
 
   #dckr_pat_MzTJsDQT5frdaDIbXJL--7yCaY4
