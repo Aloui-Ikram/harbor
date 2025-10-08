@@ -127,6 +127,10 @@ jobs:
           cosign sign-blob --yes --oidc-provider=github "${{ steps.build.outputs.online_bundle }}"
         env:
           COSIGN_EXPERIMENTAL: 1
+      - name: List Files in Workspace
+        run: |
+          echo "Listing files in workspace..."
+          ls -lR src/github.com/goharbor/harbor/
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
