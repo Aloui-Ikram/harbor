@@ -7,46 +7,46 @@ on:
     branches:
       - main
       - release-*
-      - feature/cosign-keyless-signing-release-artifacts
+      - feature/cosign-keyless-signing-release-artifacts # <---  feature branch for testing
 
 jobs:
   BUILD_PACKAGE:
     env:
         BUILD_PACKAGE: true
-    runs-on: ubuntu-latest
-    
+    runs-on:
+      - ubuntu-latest
     permissions:
-      id-token: write      # CRITICAL: Required for OIDC token (keyless signing)
-      contents: write      # Required for creating releases and uploading assets
-      packages: write      # Required for pushing to GHCR
+      id-token: write
+      contents: read
+      packages: write # <-- Essential for pushing to GHCR
     steps:
+      # - name: Configure AWS credentials
+      #   uses: aws-actions/configure-aws-credentials@v5.0.0
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #    aws-region: us-east-1
       - name: Set up Go 1.22
         uses: actions/setup-go@v5
         with:
           go-version: 1.23.2
         id: go
-      
       - name: Setup Docker
         uses: docker-practice/actions-setup-docker@master
         with:
           docker_version: 20.10
           docker_channel: stable
-      
       - uses: actions/checkout@v5
-      
       - uses: jitterbit/get-changed-files@v1
         id: changed-files
         with:
           format: space-delimited
           token: ${{ secrets.GITHUB_TOKEN }}
-      
       - uses: actions/checkout@v5
         with:
           path: src/github.com/goharbor/harbor
-      
-      - name: Install Cosign
+      - name: Install Cosign 
         uses: sigstore/cosign-installer@v3.7.0
-      
       - name: Build Base Image
         if: |
             contains(steps.changed-files.outputs.modified, 'Dockerfile.base') ||
@@ -56,7 +56,6 @@ jobs:
         run: |
           set -x
           echo "BUILD_BASE=true" >> $GITHUB_ENV
-      
       - name: Build Package
         run: |
           set -x
@@ -70,8 +69,7 @@ jobs:
           harbor_builds_bucket="harbor-builds"
           harbor_releases_bucket="harbor-releases"
           harbor_ci_pipeline_store_bucket="harbor-ci-pipeline-store/latest"
-          
-          # the target release version is the version of next release(RC or GA)
+          # the target release version is the version of next release(RC or GA). It needs to be updated on creating new release branch.
           target_release_version=$(cat ./VERSION)
           Harbor_Package_Version=$target_release_version-'build.'$GITHUB_RUN_NUMBER
 
@@ -91,206 +89,43 @@ jobs:
 
           build_base_params=" BUILD_BASE=false"
           cd src/github.com/goharbor/harbor
-          
-          if [ -z "$BUILD_BASE" ] || [ "$BUILD_BASE" != "true" ]; then
+          if [ -z "$BUILD_BASE"  ] || [ "$BUILD_BASE" != "true"  ]; then
             echo "Do not need to build base images!"
           else
             build_base_params=" BUILD_BASE=true PULL_BASE_FROM_DOCKERHUB=true PUSHBASEIMAGE=true REGISTRYUSER=\"${{ secrets.DOCKER_HUB_USERNAME }}\" REGISTRYPASSWORD=\"${{ secrets.DOCKER_HUB_PASSWORD }}\""
           fi
-          
-          # Build offline installer
           sudo make package_offline GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
-          
-          # Build online installer
           sudo make package_online GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
-          
           harbor_offline_build_bundle=$(basename harbor-offline-installer-*.tgz)
           harbor_online_build_bundle=$(basename harbor-online-installer-*.tgz)
-          
-          echo "📦 Offline package: $harbor_offline_build_bundle"
-          echo "📦 Online package: $harbor_online_build_bundle"
+          echo "Package name is: $harbor_offline_build_bundle"
+          echo "Package name is: $harbor_online_build_bundle"
 
-          # Create latest symlinks
           source tests/ci/build_util.sh
-          cp ${harbor_offline_build_bundle} harbor-offline-installer-latest.tgz
-          cp ${harbor_online_build_bundle} harbor-online-installer-latest.tgz
-          
-          # Export environment variables for next steps
-          echo "OFFLINE_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
-          echo "ONLINE_BUNDLE=$harbor_online_build_bundle" >> $GITHUB_ENV
-          echo "HARBOR_VERSION=$Harbor_Assets_Version" >> $GITHUB_ENV
-          echo "TARGET_BRANCH=$target_branch" >> $GITHUB_ENV
+          cp ${harbor_offline_build_bundle}                 harbor-offline-installer-latest.tgz
+          cp ${harbor_online_build_bundle}                  harbor-online-installer-latest.tgz
+          # uploader ${harbor_offline_build_bundle}           $harbor_target_bucket
+          # uploader ${harbor_online_build_bundle}            $harbor_target_bucket
+          # uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
+          # uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
+          echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
 
           publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
-      
-      # ==========================================
-      # TASK 1: Sign artifacts using Cosign
-      # ==========================================
-      
-      - name: Generate artifact checksums
-        working-directory: src/github.com/goharbor/harbor
+      - name: Sign Offline Installer with Cosign 
         run: |
-          set -x
-          
-          echo "Generating SHA256 checksums..."
-          sha256sum ${{ env.OFFLINE_BUNDLE }} > ${{ env.OFFLINE_BUNDLE }}.sha256
-          sha256sum ${{ env.ONLINE_BUNDLE }} > ${{ env.ONLINE_BUNDLE }}.sha256
-          
-          echo "✓ Checksums generated:"
-          cat ${{ env.OFFLINE_BUNDLE }}.sha256
-          cat ${{ env.ONLINE_BUNDLE }}.sha256
-      
-      # ==========================================
-      # TASK 2 & 3: Sign artifacts keyless with pipeline
-      # ==========================================
-      
-      - name: Sign Offline Installer with Cosign (Keyless)
-        working-directory: src/github.com/goharbor/harbor
+          harbor_offline_build_bundle=$(basename harbor-offline-installer-*.tgz)
+          # Use --yes to skip interactive confirmation in CI/CD
+          cosign sign --yes $harbor_offline_build_bundle
+        env:
+          # COSIGN_REPOSITORY specifies where to store the signature metadata.
+          # This typically points to an OCI registry (like ghcr.io, GCR, Docker Hub).
+          # I MUST confirm the correct registry with my mentor for the main Harbor project.: What is the official OCI registry path for storing Cosign signature metadata for the goharbor/harbor project's release artifacts?
+          # For a starting point, I might use ghcr.io/<your-username>/harbor for testing in your fork.
+          COSIGN_REPOSITORY: ghcr.io/${{ github.repository_owner }}/harbor-signatures
+
+      - name: Sign Online Installer with Cosign 
         run: |
-          set -x
-          
-          echo "🔐 Signing offline installer with Cosign (keyless mode)..."
-          
-          # Sign the artifact blob (not a container image)
-          cosign sign-blob \
-            --yes \
-            --bundle ${{ env.OFFLINE_BUNDLE }}.cosign.bundle \
-            ${{ env.OFFLINE_BUNDLE }}
-          
-          echo "✓ Signature bundle created: ${{ env.OFFLINE_BUNDLE }}.cosign.bundle"
-          
-          # Display bundle info
-          echo "Signature bundle contents:"
-          cat ${{ env.OFFLINE_BUNDLE }}.cosign.bundle | jq '.'
-      
-      - name: Sign Online Installer with Cosign (Keyless)
-        working-directory: src/github.com/goharbor/harbor
-        run: |
-          set -x
-          
-          echo "🔐 Signing online installer with Cosign (keyless mode)..."
-          
-          # Sign the artifact blob
-          cosign sign-blob \
-            --yes \
-            --bundle ${{ env.ONLINE_BUNDLE }}.cosign.bundle \
-            ${{ env.ONLINE_BUNDLE }}
-          
-          echo "✓ Signature bundle created: ${{ env.ONLINE_BUNDLE }}.cosign.bundle"
-          
-          # Display bundle info
-          echo "Signature bundle contents:"
-          cat ${{ env.ONLINE_BUNDLE }}.cosign.bundle | jq '.'
-      
-      - name: Verify Signed Artifacts
-        working-directory: src/github.com/goharbor/harbor
-        run: |
-          set -x
-          
-          echo "🔍 Verifying offline installer signature..."
-          cosign verify-blob \
-            --bundle ${{ env.OFFLINE_BUNDLE }}.cosign.bundle \
-            --certificate-identity-regexp="https://github.com/${{ github.repository }}" \
-            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            ${{ env.OFFLINE_BUNDLE }}
-          
-          echo "✓ Offline installer signature verified!"
-          
-          echo "🔍 Verifying online installer signature..."
-          cosign verify-blob \
-            --bundle ${{ env.ONLINE_BUNDLE }}.cosign.bundle \
-            --certificate-identity-regexp="https://github.com/${{ github.repository }}" \
-            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            ${{ env.ONLINE_BUNDLE }}
-          
-          echo "✓ Online installer signature verified!"
-          echo "✅ All artifacts successfully signed and verified!"
-      
-      - name: Generate Signing Documentation
-        working-directory: src/github.com/goharbor/harbor
-        run: |
-          cat > SIGNATURE_VERIFICATION.md << 'EOF'
-          # Harbor Artifact Signature Verification
-          
-          ## Overview
-          All Harbor release artifacts are signed using [Cosign](https://github.com/sigstore/cosign) with keyless signing (OIDC).
-          
-          ## Verification Instructions
-          
-          ### Prerequisites
-          Install Cosign:
-          ```bash
-          # Linux/macOS
-          brew install cosign
-          
-          # Or download from: https://github.com/sigstore/cosign/releases
-          ```
-          
-          ### Verify Offline Installer
-          ```bash
-          # Download the installer and signature bundle
-          wget https://github.com/goharbor/harbor/releases/download/VERSION/harbor-offline-installer-VERSION.tgz
-          wget https://github.com/goharbor/harbor/releases/download/VERSION/harbor-offline-installer-VERSION.tgz.cosign.bundle
-          
-          # Verify the signature
-          cosign verify-blob \
-            --bundle harbor-offline-installer-VERSION.tgz.cosign.bundle \
-            --certificate-identity-regexp="https://github.com/goharbor/harbor" \
-            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            harbor-offline-installer-VERSION.tgz
-          ```
-          
-          ### Verify Online Installer
-          ```bash
-          # Download the installer and signature bundle
-          wget https://github.com/goharbor/harbor/releases/download/VERSION/harbor-online-installer-VERSION.tgz
-          wget https://github.com/goharbor/harbor/releases/download/VERSION/harbor-online-installer-VERSION.tgz.cosign.bundle
-          
-          # Verify the signature
-          cosign verify-blob \
-            --bundle harbor-online-installer-VERSION.tgz.cosign.bundle \
-            --certificate-identity-regexp="https://github.com/goharbor/harbor" \
-            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            harbor-online-installer-VERSION.tgz
-          ```
-          
-          ## Verify Checksums
-          ```bash
-          # Verify SHA256 checksum
-          sha256sum -c harbor-offline-installer-VERSION.tgz.sha256
-          sha256sum -c harbor-online-installer-VERSION.tgz.sha256
-          ```
-          EOF
-          
-          echo "✓ Verification documentation generated"
-      
-      - name: Upload Signed Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: harbor-signed-installers-${{ env.HARBOR_VERSION }}
-          path: |
-            src/github.com/goharbor/harbor/harbor-offline-installer-*.tgz
-            src/github.com/goharbor/harbor/harbor-offline-installer-*.tgz.sha256
-            src/github.com/goharbor/harbor/harbor-offline-installer-*.tgz.cosign.bundle
-            src/github.com/goharbor/harbor/harbor-online-installer-*.tgz
-            src/github.com/goharbor/harbor/harbor-online-installer-*.tgz.sha256
-            src/github.com/goharbor/harbor/harbor-online-installer-*.tgz.cosign.bundle
-            src/github.com/goharbor/harbor/SIGNATURE_VERIFICATION.md
-          retention-days: 90
-      
-      - name: Summary
-        working-directory: src/github.com/goharbor/harbor
-        run: |
-          echo "## 🎉 Build and Signing Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Artifacts Generated" >> $GITHUB_STEP_SUMMARY
-          echo "- 📦 Offline Installer: \`${{ env.OFFLINE_BUNDLE }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 📦 Online Installer: \`${{ env.ONLINE_BUNDLE }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔐 Offline Signature: \`${{ env.OFFLINE_BUNDLE }}.cosign.bundle\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔐 Online Signature: \`${{ env.ONLINE_BUNDLE }}.cosign.bundle\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 📝 Checksums: SHA256 files generated" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Verification Status" >> $GITHUB_STEP_SUMMARY
-          echo "✅ All artifacts signed with Cosign keyless mode" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Signatures verified successfully" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Ready for distribution" >> $GITHUB_STEP_SUMMARY
+          harbor_online_build_bundle=$(basename harbor-online-installer-*.tgz)
+          cosign sign --yes $harbor_online_build_bundle
+        env:
+          COSIGN_REPOSITORY: ghcr.io/${{ github.repository_owner }}/harbor-signatures
