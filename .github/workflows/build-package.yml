@@ -70,7 +70,7 @@ jobs:
           harbor_releases_bucket="harbor-releases"
           harbor_ci_pipeline_store_bucket="harbor-ci-pipeline-store/latest"
           # the target release version is the version of next release(RC or GA). It needs to be updated on creating new release branch.
-          target_release_version=$(cat ./VERSION)
+          target_release_version=$(cat ./VERSION | tr -d '\n\r' | sed 's/^v//') 
           Harbor_Package_Version=$target_release_version-'build.'$GITHUB_RUN_NUMBER
 
           if [[ $target_branch == "main" ]]; then
@@ -94,6 +94,20 @@ jobs:
           else
             build_base_params=" BUILD_BASE=true PULL_BASE_FROM_DOCKERHUB=true PUSHBASEIMAGE=true REGISTRYUSER=\"${{ secrets.DOCKER_HUB_USERNAME }}\" REGISTRYPASSWORD=\"${{ secrets.DOCKER_HUB_PASSWORD }}\""
           fi
+          if [ -z "$Harbor_Assets_Version" ]; then
+              Harbor_Assets_Version="unknown-build-$(date +%s)" # Fallback with a unique timestamp
+              echo "WARNING: Harbor_Assets_Version was empty, set to '$Harbor_Assets_Version'"
+          fi
+          # Ensure Harbor_Package_Version is never empty
+          if [ -z "$Harbor_Package_Version" ]; then
+              Harbor_Package_Version="unknown-pkg-$(date +%s)" # Fallback with a unique timestamp
+              echo "WARNING: Harbor_Package_Version was empty, set to '$Harbor_Package_Version'"
+          fi
+          echo "DEBUG: target_release_version=$target_release_version"
+          echo "DEBUG: Harbor_Package_Version=$Harbor_Package_Version"
+          echo "DEBUG: Harbor_Assets_Version=$Harbor_Assets_Version"
+          echo "DEBUG: Harbor_Build_Base_Tag=$Harbor_Build_Base_Tag"
+          echo "DEBUG: build_base_params=$build_base_params"
           sudo make package_offline GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
           sudo make package_online GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
           harbor_offline_build_bundle=$(basename harbor-offline-installer-*.tgz)
