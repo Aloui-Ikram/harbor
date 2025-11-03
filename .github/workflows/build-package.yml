@@ -13,8 +13,8 @@ jobs:
   BUILD_PACKAGE:
     env:
         BUILD_PACKAGE: true
-    runs-on:
-      - ubuntu-latest
+    runs-on: ubuntu-latest
+    
     permissions:
       id-token: write      # CRITICAL: Required for OIDC token (keyless signing)
       contents: write      # Required for creating releases and uploading assets
@@ -121,7 +121,6 @@ jobs:
           echo "HARBOR_VERSION=$Harbor_Assets_Version" >> $GITHUB_ENV
           echo "TARGET_BRANCH=$target_branch" >> $GITHUB_ENV
 
-          # Publish Docker images
           publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
       
       # ==========================================
@@ -207,10 +206,6 @@ jobs:
           echo "✓ Online installer signature verified!"
           echo "✅ All artifacts successfully signed and verified!"
       
-      # ==========================================
-      # TASK 1 CONTINUED: Update makefiles (documentation)
-      # ==========================================
-      
       - name: Generate Signing Documentation
         working-directory: src/github.com/goharbor/harbor
         run: |
@@ -265,52 +260,11 @@ jobs:
           sha256sum -c harbor-offline-installer-VERSION.tgz.sha256
           sha256sum -c harbor-online-installer-VERSION.tgz.sha256
           ```
-          
-          ## What is Keyless Signing?
-          
-          Keyless signing uses GitHub's OIDC identity to sign artifacts without managing long-lived private keys:
-          - ✅ No private keys to secure or rotate
-          - ✅ Signatures include certificate transparency log entries
-          - ✅ Full audit trail of who signed what and when
-          - ✅ Verifiable against GitHub Actions identity
-          
-          ## Signature Bundle Contents
-          
-          Each `.cosign.bundle` file contains:
-          - **Signature**: Cryptographic signature of the artifact
-          - **Certificate**: Short-lived certificate from Sigstore CA
-          - **Rekor Entry**: Transparency log entry proving when signing occurred
-          
-          ## Security Benefits
-          
-          1. **Authenticity**: Verify artifacts came from official Harbor CI/CD
-          2. **Integrity**: Detect any tampering with release files
-          3. **Non-repudiation**: Signatures are logged in public transparency log
-          4. **Supply Chain Security**: Part of SLSA (Supply-chain Levels for Software Artifacts) compliance
-          
-          ## Troubleshooting
-          
-          ### "certificate identity" mismatch
-          Ensure you're using the correct repository in the verification command.
-          
-          ### "bundle not found"
-          Download the `.cosign.bundle` file from the same release location as the installer.
-          
-          ### "Rekor entry not found"
-          Wait a few minutes for Rekor transparency log propagation.
-          
-          For more information, visit: https://docs.sigstore.dev/
           EOF
           
           echo "✓ Verification documentation generated"
-          cat SIGNATURE_VERIFICATION.md
-      
-      # ==========================================
-      # Upload artifacts (for releases)
-      # ==========================================
       
       - name: Upload Signed Artifacts
-        if: startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: harbor-signed-installers-${{ env.HARBOR_VERSION }}
@@ -340,12 +294,3 @@ jobs:
           echo "✅ All artifacts signed with Cosign keyless mode" >> $GITHUB_STEP_SUMMARY
           echo "✅ Signatures verified successfully" >> $GITHUB_STEP_SUMMARY
           echo "✅ Ready for distribution" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### How to Verify" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "cosign verify-blob \\" >> $GITHUB_STEP_SUMMARY
-          echo "  --bundle ${{ env.OFFLINE_BUNDLE }}.cosign.bundle \\" >> $GITHUB_STEP_SUMMARY
-          echo "  --certificate-identity-regexp=\"https://github.com/${{ github.repository }}\" \\" >> $GITHUB_STEP_SUMMARY
-          echo "  --certificate-oidc-issuer=\"https://token.actions.githubusercontent.com\" \\" >> $GITHUB_STEP_SUMMARY
-          echo "  ${{ env.OFFLINE_BUNDLE }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
