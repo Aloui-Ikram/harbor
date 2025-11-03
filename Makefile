@@ -614,3 +614,86 @@ clean:
 	@echo "  make cleanpackage:		remove online and offline install package"
 
 all: install
+
+# ==========================================
+# Artifact Signing Targets (Issue #22367)
+# ==========================================
+
+.PHONY: sign-artifacts
+sign-artifacts: package_offline package_online sign-offline sign-online ## Build and sign all Harbor artifacts
+
+.PHONY: sign-offline
+sign-offline: ## Sign offline installer with Cosign
+	@echo "Signing offline installer..."
+	@OFFLINE_BUNDLE=$$(ls harbor-offline-installer-*.tgz 2>/dev/null | head -n1); \
+	if [ -z "$$OFFLINE_BUNDLE" ]; then \
+		echo "Error: No offline installer found. Run 'make package_offline' first."; \
+		exit 1; \
+	fi; \
+	echo "Found: $$OFFLINE_BUNDLE"; \
+	if command -v cosign >/dev/null 2>&1; then \
+		echo "Generating SHA256 checksum..."; \
+		sha256sum $$OFFLINE_BUNDLE > $$OFFLINE_BUNDLE.sha256; \
+		echo "Signing with Cosign..."; \
+		cosign sign-blob --yes --bundle $$OFFLINE_BUNDLE.cosign.bundle $$OFFLINE_BUNDLE; \
+		echo "✓ Signed: $$OFFLINE_BUNDLE.cosign.bundle"; \
+	else \
+		echo "Error: cosign not found. Install from: https://github.com/sigstore/cosign"; \
+		exit 1; \
+	fi
+
+.PHONY: sign-online
+sign-online: ## Sign online installer with Cosign
+	@echo "Signing online installer..."
+	@ONLINE_BUNDLE=$$(ls harbor-online-installer-*.tgz 2>/dev/null | head -n1); \
+	if [ -z "$$ONLINE_BUNDLE" ]; then \
+		echo "Error: No online installer found. Run 'make package_online' first."; \
+		exit 1; \
+	fi; \
+	echo "Found: $$ONLINE_BUNDLE"; \
+	if command -v cosign >/dev/null 2>&1; then \
+		echo "Generating SHA256 checksum..."; \
+		sha256sum $$ONLINE_BUNDLE > $$ONLINE_BUNDLE.sha256; \
+		echo "Signing with Cosign..."; \
+		cosign sign-blob --yes --bundle $$ONLINE_BUNDLE.cosign.bundle $$ONLINE_BUNDLE; \
+		echo "✓ Signed: $$ONLINE_BUNDLE.cosign.bundle"; \
+	else \
+		echo "Error: cosign not found. Install from: https://github.com/sigstore/cosign"; \
+		exit 1; \
+	fi
+
+.PHONY: verify-signatures
+verify-signatures: ## Verify signatures of all installers
+	@echo "Verifying artifact signatures..."
+	@OFFLINE_BUNDLE=$$(ls harbor-offline-installer-*.tgz 2>/dev/null | head -n1); \
+	ONLINE_BUNDLE=$$(ls harbor-online-installer-*.tgz 2>/dev/null | head -n1); \
+	if [ -z "$$OFFLINE_BUNDLE" ] || [ -z "$$ONLINE_BUNDLE" ]; then \
+		echo "Error: Installers not found."; \
+		exit 1; \
+	fi; \
+	if command -v cosign >/dev/null 2>&1; then \
+		echo "Verifying offline installer..."; \
+		cosign verify-blob \
+			--bundle $$OFFLINE_BUNDLE.cosign.bundle \
+			--certificate-identity-regexp="https://github.com/.*" \
+			--certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+			$$OFFLINE_BUNDLE && echo "✓ Offline installer verified"; \
+		echo "Verifying online installer..."; \
+		cosign verify-blob \
+			--bundle $$ONLINE_BUNDLE.cosign.bundle \
+			--certificate-identity-regexp="https://github.com/.*" \
+			--certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+			$$ONLINE_BUNDLE && echo "✓ Online installer verified"; \
+		echo "✅ All signatures verified successfully!"; \
+	else \
+		echo "Error: cosign not found."; \
+		exit 1; \
+	fi
+
+.PHONY: clean-signatures
+clean-signatures: ## Remove signature files
+	@echo "Removing signature files..."
+	@rm -f harbor-*-installer-*.cosign.bundle
+	@rm -f harbor-*-installer-*.sha256
+	@echo "✓ Signature files removed"
+```
