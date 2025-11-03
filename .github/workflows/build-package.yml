@@ -7,6 +7,7 @@ on:
     branches:
       - main
       - release-*
+      - feature/cosign-keyless-signing-release-artifacts # <---  feature branch for testing
 
 jobs:
   BUILD_PACKAGE:
@@ -14,13 +15,17 @@ jobs:
         BUILD_PACKAGE: true
     runs-on:
       - oracle-vm-24cpu-96gb-x86-64
+    permissions:
+      id-token: write
+      contents: read
+      packages: write # <-- Essential for pushing to GHCR
     steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5.0.0
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+      # - name: Configure AWS credentials
+      #   uses: aws-actions/configure-aws-credentials@v5.0.0
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #    aws-region: us-east-1
       - name: Set up Go 1.22
         uses: actions/setup-go@v5
         with:
@@ -40,6 +45,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           path: src/github.com/goharbor/harbor
+      - name: Install Cosign 
+        uses: sigstore/cosign-installer@v3.7.0
       - name: Build Base Image
         if: |
             contains(steps.changed-files.outputs.modified, 'Dockerfile.base') ||
@@ -97,10 +104,28 @@ jobs:
           source tests/ci/build_util.sh
           cp ${harbor_offline_build_bundle}                 harbor-offline-installer-latest.tgz
           cp ${harbor_online_build_bundle}                  harbor-online-installer-latest.tgz
-          uploader ${harbor_offline_build_bundle}           $harbor_target_bucket
-          uploader ${harbor_online_build_bundle}            $harbor_target_bucket
-          uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
-          uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
+          # uploader ${harbor_offline_build_bundle}           $harbor_target_bucket
+          # uploader ${harbor_online_build_bundle}            $harbor_target_bucket
+          # uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
+          # uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
           echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
 
           publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
+      - name: Sign Offline Installer with Cosign 
+        run: |
+          harbor_offline_build_bundle=$(basename harbor-offline-installer-*.tgz)
+          # Use --yes to skip interactive confirmation in CI/CD
+          cosign sign --yes $harbor_offline_build_bundle
+        env:
+          # COSIGN_REPOSITORY specifies where to store the signature metadata.
+          # This typically points to an OCI registry (like ghcr.io, GCR, Docker Hub).
+          # I MUST confirm the correct registry with my mentor for the main Harbor project.: What is the official OCI registry path for storing Cosign signature metadata for the goharbor/harbor project's release artifacts?
+          # For a starting point, I might use ghcr.io/<your-username>/harbor for testing in your fork.
+          COSIGN_REPOSITORY: ghcr.io/${{ github.repository_owner }}/harbor-signatures
+
+      - name: Sign Online Installer with Cosign 
+        run: |
+          harbor_online_build_bundle=$(basename harbor-online-installer-*.tgz)
+          cosign sign --yes $harbor_online_build_bundle
+        env:
+          COSIGN_REPOSITORY: ghcr.io/${{ github.repository_owner }}/harbor-signatures
