@@ -153,3 +153,13 @@ jobs:
           cosign sign-blob --yes --bundle=${harbor_online_build_bundle}.bundle $harbor_online_build_bundle
         env:
           COSIGN_REPOSITORY: ghcr.io/aloui-ikram/harbor-signatures
+      - name: Upload Signed Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-signed-installers
+          path: |
+            src/github.com/goharbor/harbor/harbor-offline-installer-*.tgz
+            src/github.com/goharbor/harbor/harbor-offline-installer-*.tgz.bundle
+            src/github.com/goharbor/harbor/harbor-online-installer-*.tgz
+            src/github.com/goharbor/harbor/harbor-online-installer-*.tgz.bundle
+          retention-days: 90
