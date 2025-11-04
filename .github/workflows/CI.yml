@@ -40,7 +40,8 @@ on:
       - '!tests/resources/**'
       - '!tests/robot-cases/**'
       - '!tests/robot-cases/Group1-Nightly/**'
-
+    branches-ignore:
+      - 'feature/cosign-keyless-signing-release-artifacts' 
 jobs:
   UTTEST:
     env:
