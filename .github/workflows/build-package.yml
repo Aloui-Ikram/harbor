@@ -135,11 +135,11 @@ jobs:
           # This typically points to an OCI registry (like ghcr.io, GCR, Docker Hub).
           # I MUST confirm the correct registry with my mentor for the main Harbor project.: What is the official OCI registry path for storing Cosign signature metadata for the goharbor/harbor project's release artifacts?
           # For a starting point, I might use ghcr.io/<your-username>/harbor for testing in your fork.
-          COSIGN_REPOSITORY: ghcr.io/${{ github.repository }}
+          COSIGN_REPOSITORY: ghcr.io/Aloui-Ikram/harbor-signatures
 
       - name: Sign Online Installer with Cosign 
         run: |
           harbor_online_build_bundle=$(basename harbor-online-installer-*.tgz)
           cosign sign --yes $harbor_online_build_bundle
         env:
-          COSIGN_REPOSITORY: ghcr.io/${{ github.repository }}
+          COSIGN_REPOSITORY: ghcr.io/Aloui-Ikram/harbor-signatures
