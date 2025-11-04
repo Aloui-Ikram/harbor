@@ -133,9 +133,10 @@ jobs:
         # publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
       - name: Sign Offline Installer with Cosign 
         run: |
-          harbor_offline_build_bundle=$(basename harbor-offline-installer-*.tgz)
-          # Use --yes to skip interactive confirmation in CI/CD
-          cosign sign --yes $harbor_offline_build_bundle
+          cd src/github.com/goharbor/harbor
+          harbor_offline_build_bundle=$(ls harbor-offline-installer-*.tgz | head -n 1)
+          echo "Signing: $harbor_offline_build_bundle"
+          cosign sign-blob --yes --bundle=${harbor_offline_build_bundle}.bundle $harbor_offline_build_bundle
         env:
           # COSIGN_REPOSITORY specifies where to store the signature metadata.
           # This typically points to an OCI registry (like ghcr.io, GCR, Docker Hub).
@@ -146,7 +147,9 @@ jobs:
 
       - name: Sign Online Installer with Cosign 
         run: |
-          harbor_online_build_bundle=$(basename harbor-online-installer-*.tgz)
-          cosign sign --yes $harbor_online_build_bundle
+          cd src/github.com/goharbor/harbor
+          harbor_online_build_bundle=$(ls harbor-online-installer-*.tgz | head -n 1)
+          echo "Signing: $harbor_online_build_bundle"
+          cosign sign-blob --yes --bundle=${harbor_online_build_bundle}.bundle $harbor_online_build_bundle
         env:
           COSIGN_REPOSITORY: ghcr.io/aloui-ikram/harbor-signatures
