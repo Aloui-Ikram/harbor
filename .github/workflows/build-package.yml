@@ -14,7 +14,7 @@ jobs:
     env:
         BUILD_PACKAGE: true
     runs-on:
-      - ubuntu-latest
+      - oracle-vm-24cpu-96gb-x86-64
     permissions:
       id-token: write
       contents: read
@@ -62,7 +62,7 @@ jobs:
             github.ref == 'refs/heads/feature/cosign-keyless-signing-release-artifacts'
         run: |
           set -x
-          echo "BUILD_BASE=true" >> $GITHUB_ENV
+          echo "BUILD_BASE=false" >> $GITHUB_ENV
       - name: Build Package
         run: |
           set -x
@@ -127,10 +127,10 @@ jobs:
           source tests/ci/build_util.sh
           cp ${harbor_offline_build_bundle}                 harbor-offline-installer-latest.tgz
           cp ${harbor_online_build_bundle}                  harbor-online-installer-latest.tgz
-           uploader ${harbor_offline_build_bundle}           $harbor_target_bucket
-           uploader ${harbor_online_build_bundle}            $harbor_target_bucket
-           uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
-           uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
+          #  uploader ${harbor_offline_build_bundle}           $harbor_target_bucket
+          #  uploader ${harbor_online_build_bundle}            $harbor_target_bucket
+          #  uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
+          #  uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
           echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
 
          # publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
