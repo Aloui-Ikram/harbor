@@ -20,12 +20,12 @@ jobs:
       contents: read
       packages: write # <-- Essential for pushing to GHCR
     steps:
-      # - name: Configure AWS credentials
-      #   uses: aws-actions/configure-aws-credentials@v5.0.0
-      #   with:
-      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #    aws-region: us-east-1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
       - name: Set up Go 1.22
         uses: actions/setup-go@v5
         with:
@@ -124,13 +124,13 @@ jobs:
           source tests/ci/build_util.sh
           cp ${harbor_offline_build_bundle}                 harbor-offline-installer-latest.tgz
           cp ${harbor_online_build_bundle}                  harbor-online-installer-latest.tgz
-          # uploader ${harbor_offline_build_bundle}           $harbor_target_bucket
-          # uploader ${harbor_online_build_bundle}            $harbor_target_bucket
-          # uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
-          # uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
+           uploader ${harbor_offline_build_bundle}           $harbor_target_bucket
+           uploader ${harbor_online_build_bundle}            $harbor_target_bucket
+           uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
+           uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
           echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
 
-        # publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
+          publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
       - name: Sign Offline Installer with Cosign 
         run: |
           cd src/github.com/goharbor/harbor
