@@ -62,7 +62,7 @@ jobs:
             github.ref == 'refs/heads/feature/cosign-keyless-signing-release-artifacts'
         run: |
           set -x
-          echo "BUILD_BASE=false" >> $GITHUB_ENV
+          echo "BUILD_BASE=true" >> $GITHUB_ENV
       - name: Build Package
         run: |
           set -x
