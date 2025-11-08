@@ -51,6 +51,30 @@ For learning the architecture design of Harbor, check the document [Architecture
   * Part 1: [New or changed APIs](https://editor.swagger.io/?url=https://raw.githubusercontent.com/goharbor/harbor/main/api/v2.0/swagger.yaml)
 
 ## Install & Run
+### Verifying Release Signatures
+
+Harbor release artifacts are cryptographically signed using [Cosign](https://docs.sigstore.dev/cosign/overview/) with keyless signing. This ensures authenticity and integrity.
+
+#### Quick Verification
+```bash
+# Install Cosign
+brew install sigstore/tap/cosign
+
+# Download installer + signature bundle
+wget https://github.com/goharbor/harbor/releases/download/v2.14.0/harbor-offline-installer-v2.14.0.tgz
+wget https://github.com/goharbor/harbor/releases/download/v2.14.0/harbor-offline-installer-v2.14.0.tgz.bundle
+
+# Verify
+cosign verify-blob \
+  --bundle harbor-offline-installer-v2.14.0.tgz.bundle \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github.com/goharbor/harbor/.github/workflows/build-package.yml@refs/(heads/main|tags/v.*)$' \
+  harbor-offline-installer-v2.14.0.tgz
+```
+
+**Expected output:** `Verified OK`
+
+📖 **Detailed guide:** See [docs/signature-verification.md](docs/signature-verification.md)
 
 **System requirements:**
 

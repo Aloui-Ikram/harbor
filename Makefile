@@ -470,7 +470,30 @@ package_offline: check_buildinstaller update_prepare_version compile build
 	@echo "Done."
 
 go_check: gen_apis mocks_check misspell commentfmt lint
+# Sign Harbor release artifacts with Cosign
+sign_artifacts:
+	@echo "Signing Harbor release artifacts with Cosign..."
+	@if [ -f harbor-offline-installer-$(PKGVERSIONTAG).tgz ]; then \
+		echo "Signing offline installer..." ; \
+		cosign sign-blob --yes \
+			--bundle=harbor-offline-installer-$(PKGVERSIONTAG).tgz.bundle \
+			harbor-offline-installer-$(PKGVERSIONTAG).tgz ; \
+		echo "✅ Offline installer signed" ; \
+	else \
+		echo "⚠️  Offline installer not found" ; \
+	fi
+	@if [ -f harbor-online-installer-$(PKGVERSIONTAG).tgz ]; then \
+		echo "Signing online installer..." ; \
+		cosign sign-blob --yes \
+			--bundle=harbor-online-installer-$(PKGVERSIONTAG).tgz.bundle \
+			harbor-online-installer-$(PKGVERSIONTAG).tgz ; \
+		echo "✅ Online installer signed" ; \
+	else \
+		echo "⚠️  Online installer not found" ; \
+	fi
+	@echo "✅ Artifact signing complete"
 
+.PHONY: sign_artifacts
 commentfmt:
 	@echo checking comment format...
 	@res=$$(find . -type d \( -path ./tests \) -prune -o -name '*.go' -print | xargs egrep '(^|\s)\/\/(\S)'|grep -v '//go:generate'); \
