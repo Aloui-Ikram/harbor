@@ -102,6 +102,7 @@ jobs:
           #   build_base_params=" BUILD_BASE=true PULL_BASE_FROM_DOCKERHUB=true PUSHBASEIMAGE=true REGISTRYUSER=\"${{ secrets.DOCKER_HUB_USERNAME }}\" REGISTRYPASSWORD=\"${{ secrets.DOCKER_HUB_PASSWORD }}\""
           # fi
           #to test in my fork (# Define my Docker Hub username/namespace)
+          DOCKER_NAMESPACE="${{ secrets.DOCKER_HUB_USERNAME }}"
           build_base_params=" BUILD_BASE=false"
           cd src/github.com/goharbor/harbor
           if [ -z "$BUILD_BASE"  ] || [ "$BUILD_BASE" != "true"  ]; then
@@ -143,7 +144,7 @@ jobs:
            uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
           echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
 
-          publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
+          publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}" $DOCKER_NAMESPACE
       - name: Sign Offline Installer with Cosign 
         run: |
           cd src/github.com/goharbor/harbor
