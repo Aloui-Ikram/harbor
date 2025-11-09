@@ -138,10 +138,10 @@ jobs:
           source tests/ci/build_util.sh
           cp ${harbor_offline_build_bundle}                 harbor-offline-installer-latest.tgz
           cp ${harbor_online_build_bundle}                  harbor-online-installer-latest.tgz
-           uploader ${harbor_offline_build_bundle}           $harbor_target_bucket
-           uploader ${harbor_online_build_bundle}            $harbor_target_bucket
-           uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
-           uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
+           uploader ${harbor_offline_build_bundle}           $harbor_target_bucket $AWS_REGION
+           uploader ${harbor_online_build_bundle}            $harbor_target_bucket $AWS_REGION
+           uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket $AWS_REGION
+           uploader harbor-online-installer-latest.tgz       $harbor_target_bucket $AWS_REGION
           echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
 
           publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}" $DOCKER_NAMESPACE
