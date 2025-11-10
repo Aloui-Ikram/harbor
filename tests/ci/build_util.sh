@@ -24,10 +24,12 @@ function uploader {
   local file_path="$1"
   local s3_bucket="$2"
   local aws_region="$3"  # <-- Capture the new region parameter
+  local file_path="${file_name}" # NEW LINE for consistency
+  local target_bucket="${s3_bucket}"
   converted_url=$(s3_to_https "s3://$target_bucket/$file_name")
   echo "download url $converted_url"
   aws s3 cp "$file_name" "s3://$target_bucket/$file_name" --region "$aws_region"
-
+}
 function publishImage {
     echo "Publishing images to Docker Hub..."
     echo "The images on the host:"
