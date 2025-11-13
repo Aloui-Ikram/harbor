@@ -83,11 +83,14 @@ jobs:
           if [[ $target_branch == "main" ]]; then
             Harbor_Assets_Version=$Harbor_Package_Version
             harbor_target_bucket=$harbor_builds_bucket
+          # else
+          #   Harbor_Assets_Version=$target_release_version
+          #   harbor_target_bucket=$harbor_releases_bucket/$target_branch
+          # fi
           else
             Harbor_Assets_Version=$target_release_version
-            harbor_target_bucket=$harbor_releases_bucket/$target_branch
+            harbor_target_bucket="aloui-ikram-harbor-artifacts-2025/${target_branch}"
           fi
-
           if [[ $target_branch == "release-"* ]]; then
             Harbor_Build_Base_Tag=$target_release_version
           else
