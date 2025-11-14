@@ -170,6 +170,18 @@ jobs:
           cosign sign-blob --yes --bundle=${harbor_online_build_bundle}.bundle $harbor_online_build_bundle
         env:
           COSIGN_REPOSITORY: ghcr.io/aloui-ikram/harbor-signatures
+      - name: Upload Bundle Files to S3
+        run: |
+          cd src/github.com/goharbor/harbor
+          source tests/ci/build_util.sh
+          
+          # Get the bundle filenames
+          harbor_offline_bundle=$(ls harbor-offline-installer-*.tgz.bundle | head -n 1)
+          harbor_online_bundle=$(ls harbor-online-installer-*.tgz.bundle | head -n 1)
+          
+          # Upload bundles to S3
+          uploader ${harbor_offline_bundle} ${{ env.harbor_target_bucket }} us-east-1
+          uploader ${harbor_online_bundle} ${{ env.harbor_target_bucket }} us-east-1
       - name: Upload Signed Artifacts
         uses: actions/upload-artifact@v4
         with:
