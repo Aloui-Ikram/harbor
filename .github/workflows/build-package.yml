@@ -146,7 +146,7 @@ jobs:
            uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket $AWS_REGION
            uploader harbor-online-installer-latest.tgz       $harbor_target_bucket $AWS_REGION
           echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
-
+          echo "harbor_target_bucket=$harbor_target_bucket" >> $GITHUB_ENV
           publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}" $DOCKER_NAMESPACE
       - name: Sign Offline Installer with Cosign 
         run: |
@@ -180,8 +180,8 @@ jobs:
           harbor_online_bundle=$(ls harbor-online-installer-*.tgz.bundle | head -n 1)
           
           # Upload bundles to S3
-          uploader ${harbor_offline_bundle} ${{ env.harbor_target_bucket }} us-east-1
-          uploader ${harbor_online_bundle} ${{ env.harbor_target_bucket }} us-east-1
+          uploader ${harbor_offline_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
+          uploader ${harbor_online_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
       - name: Upload Signed Artifacts
         uses: actions/upload-artifact@v4
         with:
