@@ -1,14 +1,25 @@
 # Harbor Release Signature Verification
 
-## What is This?
+> **Note:** Signature verification is available starting with Harbor v2.14.0. Earlier releases are not signed.
 
-Harbor releases are **cryptographically signed** to prove they're authentic and haven't been tampered with. This guide shows you how to verify them.
+## Table of Contents
+- [Overview](#overview)
+- [Why Verify](#why-verify)
+- [Prerequisites](#prerequisites)
+- [Verification Steps](#verification-steps)
+- [Troubleshooting](#troubleshooting)
+- [What Gets Verified](#what-gets-verified)
+- [Resources](#resources)
 
-## Why Verify?
+## Overview
+
+Harbor release artifacts (installers) are cryptographically signed using [Cosign](https://docs.sigstore.dev/cosign/overview/) with keyless signing. This allows you to verify that downloads are authentic and unmodified [[4](https://docs.streamsets.com/platform-datacollector/latest/datacollector/UserGuide/Data_Formats/WholeFile.html)].
+
+## Why Verify
 
 ✅ Confirms the file came from Harbor's official build  
 ✅ Detects any modifications or tampering  
-✅ Protects against malicious downloads  
+✅ Protects against malicious downloads
 
 ## Prerequisites
 
@@ -21,6 +32,9 @@ brew install sigstore/tap/cosign
 curl -LO https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
 chmod +x cosign-linux-amd64
 sudo mv cosign-linux-amd64 /usr/local/bin/cosign
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri "https://github.com/sigstore/cosign/releases/latest/download/cosign-windows-amd64.exe" -OutFile "cosign.exe"
 
 # Verify installation
 cosign version
@@ -63,40 +77,37 @@ cosign verify-blob \
   harbor-online-installer-v2.14.0.tgz
 ```
 
-## Testing in my  Fork
+## Troubleshooting
 
-```bash
-cosign verify-blob \
-  --bundle harbor-offline-installer-v2.14.0-build.12.tgz.bundle \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github.com/Aloui-Ikram/harbor/.github/workflows/build-package.yml@' \
-  harbor-offline-installer-v2.14.0-build.12.tgz
-```
+### Certificate identity doesn't match
+**Cause:** Incorrect repository name in verification command  
+**Solution:** Ensure you're using `goharbor/harbor` in the `--certificate-identity-regexp` parameter
 
-## Common Errors
+### Unable to find signature
+**Cause:** Bundle file not in the same directory as the installer  
+**Solution:** Ensure both `.tgz` and `.tgz.bundle` files are in the current working directory
 
-### "certificate identity doesn't match"
-**Solution:** Make sure you're using the correct repository name in `--certificate-identity-regexp`
+### Bad signature
+**Cause:** Downloaded files are corrupted or incomplete  
+**Solution:** Re-download both the installer and bundle files from the official [Harbor releases page](https://github.com/goharbor/harbor/releases)
 
-### "unable to find signature"
-**Solution:** Ensure the `.bundle` file is in the same directory as the `.tgz` file
-
-### "bad signature"
-**Solution:** Re-download both files from official GitHub releases
+### Version not supported
+**Cause:** Attempting to verify releases prior to v2.14.0  
+**Solution:** Signature verification is only available for Harbor v2.14.0 and later
 
 ## What Gets Verified
 
-✅ **File authenticity** - Signed by official Harbor workflow  
+✅ **File authenticity** - Signed by official Harbor CI/CD workflow  
 ✅ **File integrity** - No modifications since signing  
-✅ **Build provenance** - Logged in public transparency log  
+✅ **Build provenance** - Logged in public Sigstore transparency log
 
 ## Resources
 
 - [Cosign Documentation](https://docs.sigstore.dev/cosign/overview/)
 - [Harbor Issue #22367](https://github.com/goharbor/harbor/issues/22367)
-- [Keyless Signing Tutorial](https://www.appvia.io/blog/tutorial-keyless-sign-and-verify-your-container-images)
+- [Sigstore Keyless Signing](https://docs.sigstore.dev/cosign/signing/signing_with_self-managed_keys/)
+- [Harbor Releases](https://github.com/goharbor/harbor/releases)
 
 ---
 
-**Last Updated:** November 2025  
-**Applies to:** Harbor v2.14.0+
+**Applies to:** Harbor v2.14.0 and later
