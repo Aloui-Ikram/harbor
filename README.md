@@ -53,18 +53,18 @@ For learning the architecture design of Harbor, check the document [Architecture
 ## Install & Run
 ### Verifying Release Signatures
 
-Harbor release artifacts are cryptographically signed using [Cosign](https://docs.sigstore.dev/cosign/overview/) with keyless signing. This ensures authenticity and integrity.
+Starting with v2.14.0, Harbor release artifacts are cryptographically signed using [Cosign](https://docs.sigstore.dev/cosign/overview/) to ensure authenticity and integrity [[2](https://github.com/sigstore/cosign)][[3](https://docs.sigstore.dev/cosign/verifying/verify/)].
 
 #### Quick Verification
 ```bash
-# Install Cosign
+# Install Cosign (v2.0+)
 brew install sigstore/tap/cosign
 
 # Download installer + signature bundle
 wget https://github.com/goharbor/harbor/releases/download/v2.14.0/harbor-offline-installer-v2.14.0.tgz
 wget https://github.com/goharbor/harbor/releases/download/v2.14.0/harbor-offline-installer-v2.14.0.tgz.bundle
 
-# Verify
+# Verify signature
 cosign verify-blob \
   --bundle harbor-offline-installer-v2.14.0.tgz.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
@@ -74,7 +74,7 @@ cosign verify-blob \
 
 **Expected output:** `Verified OK`
 
-📖 **Detailed guide:** See [docs/signature-verification.md](docs/signature-verification.md)
+📖 **Full verification guide:** [docs/signature-verification.md](docs/signature-verification.md)
 
 **System requirements:**
 
