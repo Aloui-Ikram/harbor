@@ -59,7 +59,7 @@ jobs:
             contains(steps.changed-files.outputs.modified, 'VERSION') ||
             contains(steps.changed-files.outputs.modified, '.buildbaselog') ||
             github.ref == 'refs/heads/main' ||
-            github.ref == 'refs/heads/feature/cosign-keyless-signing-release-artifacts' # ❌ REMOVE FOR PR  
+            github.ref == 'refs/heads/feature/cosign-keyless-signing-release-artifacts'
         run: |
           set -x
           echo "BUILD_BASE=true" >> $GITHUB_ENV
