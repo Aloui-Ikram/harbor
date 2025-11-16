@@ -471,6 +471,7 @@ package_offline: check_buildinstaller update_prepare_version compile build
 
 go_check: gen_apis mocks_check misspell commentfmt lint
 # Sign Harbor release artifacts with Cosign
+#Why Remove: Signing should only happen in CI/CD with OIDC tokens, not in local development.
 sign_artifacts:
 	@echo "Signing Harbor release artifacts with Cosign..."
 	@if [ -f harbor-offline-installer-$(PKGVERSIONTAG).tgz ]; then \
