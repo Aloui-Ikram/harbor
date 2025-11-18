@@ -117,10 +117,7 @@ fi
 
 if [ "$PULL_BASE_FROM_DOCKERHUB" == "true" ];then
   h2 "Remove local goharbor images"
-  # ✅ KEEP THIS FIX - Removes bug and modernizes
   DOCKER_RMI="docker rmi -f $(docker images -q --filter reference="${IMAGE%:*}")"
-  # OLD BUGGY VERSION WAS:
-  # DOCKER_RMI="docker rmi -f $(docker images | grep "${IMAGE%:*}" | awk '{print $3}') -f"
   info "$DOCKER_RMI"
   DOCKER_RMI_OUTPUT=$($DOCKER_RMI)
   if [ $? -ne 0 ];then

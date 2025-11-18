@@ -7,18 +7,15 @@ on:
     branches:
       - main
       - release-*
-      - feature/cosign-keyless-signing-release-artifacts # ❌ REMOVE FOR PR - Testing only
 jobs:
   BUILD_PACKAGE:
     env:
         BUILD_PACKAGE: true
     runs-on:
-      - ubuntu-latest   # ❌ REMOVE FOR PR - I don't have oracle-vm access
-       # ✅ CHANGE TO: oracle-vm-24cpu-96gb-x86-64
+      - oracle-vm-24cpu-96gb-x86-64
     permissions:
-      id-token: write # ✅ KEEP - Required for Cosign OIDC tokens
-      contents: read  # ✅ KEEP - Read repository code
-      packages: write # ✅ KEEP - Push to GHCR (if using it for signatures)
+      id-token: write  
+      contents: read 
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5.0.0
@@ -45,21 +42,14 @@ jobs:
       - uses: actions/checkout@v5
         with:
           path: src/github.com/goharbor/harbor
-      - name: Install Cosign   # ✅ KEEP - Core feature
+      - name: Install Cosign  
         uses: sigstore/cosign-installer@v3.7.0   
-      - name: Login to GitHub Container Registry # ⚠️ ASK vadim - Only if using GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}  
       - name: Build Base Image
         if: |
             contains(steps.changed-files.outputs.modified, 'Dockerfile.base') ||
             contains(steps.changed-files.outputs.modified, 'VERSION') ||
             contains(steps.changed-files.outputs.modified, '.buildbaselog') ||
-            github.ref == 'refs/heads/main' ||
-            github.ref == 'refs/heads/feature/cosign-keyless-signing-release-artifacts'
+            github.ref == 'refs/heads/main'
         run: |
           set -x
           echo "BUILD_BASE=true" >> $GITHUB_ENV
@@ -76,74 +66,34 @@ jobs:
           harbor_builds_bucket="harbor-builds"
           harbor_releases_bucket="harbor-releases"
           harbor_ci_pipeline_store_bucket="harbor-ci-pipeline-store/latest"
-          # ❌ REMOVE FOR PR - Unnecessary processing
           # the target release version is the version of next release(RC or GA). It needs to be updated on creating new release branch.
-          target_release_version=$(cat ./VERSION | tr -d '\n\r' | sed 's/^v//') 
-          # ✅ CHANGE TO: target_release_version=$(cat ./VERSION)
+          target_release_version=$(cat ./VERSION)
           Harbor_Package_Version=$target_release_version-'build.'$GITHUB_RUN_NUMBER
 
           if [[ $target_branch == "main" ]]; then
             Harbor_Assets_Version=$Harbor_Package_Version
             harbor_target_bucket=$harbor_builds_bucket
-          # else
-          #   Harbor_Assets_Version=$target_release_version
-          #   harbor_target_bucket=$harbor_releases_bucket/$target_branch
-          # fi
           else
             Harbor_Assets_Version=$target_release_version
-            # ❌Remove for pr - my personal bucket
-            # ✅ CHANGE TO: harbor_target_bucket=$harbor_releases_bucket/$target_branch
-            harbor_target_bucket="aloui-ikram-harbor-artifacts-2025/${target_branch}"
+            harbor_target_bucket=$harbor_releases_bucket/$target_branch
           fi
+
           if [[ $target_branch == "release-"* ]]; then
             Harbor_Build_Base_Tag=$target_release_version
           else
             Harbor_Build_Base_Tag=dev
           fi
 
-          # build_base_params=" BUILD_BASE=false"
-          # cd src/github.com/goharbor/harbor
-          # if [ -z "$BUILD_BASE"  ] || [ "$BUILD_BASE" != "true"  ]; then
-          #   echo "Do not need to build base images!"
-          # else
-          #   build_base_params=" BUILD_BASE=true PULL_BASE_FROM_DOCKERHUB=true PUSHBASEIMAGE=true REGISTRYUSER=\"${{ secrets.DOCKER_HUB_USERNAME }}\" REGISTRYPASSWORD=\"${{ secrets.DOCKER_HUB_PASSWORD }}\""
-          # fi
-          # ❌ REMOVE FOR PR - Docker namespace testing
-          #to test in my fork (# Define my Docker Hub username/namespace)
-          DOCKER_NAMESPACE="${{ secrets.DOCKER_HUB_USERNAME }}"
           build_base_params=" BUILD_BASE=false"
           cd src/github.com/goharbor/harbor
           if [ -z "$BUILD_BASE"  ] || [ "$BUILD_BASE" != "true"  ]; then
             echo "Do not need to build base images!"
           else
-            #  ❌ REMOVE FOR PR - Namespace customization
-            # Inject IMAGENAMESPACE and BASEIMAGENAMESPACE to override the default 'goharbor'
-            build_base_params=" BUILD_BASE=true PULL_BASE_FROM_DOCKERHUB=true PUSHBASEIMAGE=true IMAGENAMESPACE=$DOCKER_NAMESPACE BASEIMAGENAMESPACE=$DOCKER_NAMESPACE REGISTRYUSER=\"${{ secrets.DOCKER_HUB_USERNAME }}\" REGISTRYPASSWORD=\"${{ secrets.DOCKER_HUB_PASSWORD }}\""
-            # ✅ CHANGE TO: Original without IMAGENAMESPACE/BASEIMAGENAMESPACE
+            build_base_params=" BUILD_BASE=true PULL_BASE_FROM_DOCKERHUB=true PUSHBASEIMAGE=true REGISTRYUSER=\"${{ secrets.DOCKER_HUB_USERNAME }}\" REGISTRYPASSWORD=\"${{ secrets.DOCKER_HUB_PASSWORD }}\""
           fi
-          #  ❌ REMOVE FOR PR - Debug safety checks
-          if [ -z "$Harbor_Assets_Version" ]; then
-              Harbor_Assets_Version="unknown-build-$(date +%s)" # Fallback with a unique timestamp
-              echo "WARNING: Harbor_Assets_Version was empty, set to '$Harbor_Assets_Version'"
-          fi
-          # Ensure Harbor_Package_Version is never empty
-          if [ -z "$Harbor_Package_Version" ]; then
-              Harbor_Package_Version="unknown-pkg-$(date +%s)" # Fallback with a unique timestamp
-              echo "WARNING: Harbor_Package_Version was empty, set to '$Harbor_Package_Version'"
-          fi
-          # ❌ REMOVE FOR PR - Debug logging
-          echo "DEBUG: target_release_version=$target_release_version"
-          echo "DEBUG: Harbor_Package_Version=$Harbor_Package_Version"
-          echo "DEBUG: Harbor_Assets_Version=$Harbor_Assets_Version"
-          echo "DEBUG: Harbor_Build_Base_Tag=$Harbor_Build_Base_Tag"
-          echo "DEBUG: build_base_params=$build_base_params"
-          #  sudo make package_offline GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
-          #  sudo make package_online GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
-          # ❌ REMOVE FOR PR - Namespace parameters
-          #test on my fork # Pass the IMAGENAMESPACE and BASEIMAGENAMESPACE variables to the make calls
-          sudo make package_offline GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params} IMAGENAMESPACE=$DOCKER_NAMESPACE BASEIMAGENAMESPACE=$DOCKER_NAMESPACE 
-          sudo make package_online GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params} IMAGENAMESPACE=$DOCKER_NAMESPACE BASEIMAGENAMESPACE=$DOCKER_NAMESPACE
-          # ✅ CHANGE TO: original
+        
+          sudo make package_offline GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
+          sudo make package_online GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
           harbor_offline_build_bundle=$(basename harbor-offline-installer-*.tgz)
           harbor_online_build_bundle=$(basename harbor-online-installer-*.tgz)
           echo "Package name is: $harbor_offline_build_bundle"
@@ -152,55 +102,38 @@ jobs:
           source tests/ci/build_util.sh
           cp ${harbor_offline_build_bundle}                 harbor-offline-installer-latest.tgz
           cp ${harbor_online_build_bundle}                  harbor-online-installer-latest.tgz
-          #❌ REMOVE FOR PR - Third parameter 
-          uploader ${harbor_offline_build_bundle}           $harbor_target_bucket $AWS_REGION
-          uploader ${harbor_online_build_bundle}            $harbor_target_bucket $AWS_REGION
-          uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket $AWS_REGION
-          uploader harbor-online-installer-latest.tgz       $harbor_target_bucket $AWS_REGION
-          # ✅ CHANGE TO: Only 2 parameters (remove $AWS_REGION)
-          # ✅ KEEP - Makes bucket available to later steps
+          uploader ${harbor_offline_build_bundle}           $harbor_target_bucket
+          uploader ${harbor_online_build_bundle}            $harbor_target_bucket
+          uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
+          uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
           echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
           echo "harbor_target_bucket=$harbor_target_bucket" >> $GITHUB_ENV
-          # ❌ REMOVE FOR PR - Last parameter  # ✅ CHANGE TO: Remove $DOCKER_NAMESPACE parameter
-          publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}" $DOCKER_NAMESPACE
-      - name: Sign Offline Installer with Cosign   # ✅ KEEP (with repo change)
+      
+          publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
+      - name: Sign Offline Installer with Cosign 
         run: |
           cd src/github.com/goharbor/harbor
           harbor_offline_build_bundle=$(ls harbor-offline-installer-*.tgz | head -n 1)
           echo "Signing: $harbor_offline_build_bundle"
           cosign sign-blob --yes --bundle=${harbor_offline_build_bundle}.bundle $harbor_offline_build_bundle
-        env:
-          # ❌ REMOVE FOR PR - My testing repository
-          # COSIGN_REPOSITORY specifies where to store the signature metadata.
-          # This typically points to an OCI registry (like ghcr.io, GCR, Docker Hub).
-          # I MUST confirm the correct registry with my mentor for the main Harbor project.: What is the official OCI registry path for storing Cosign signature metadata for the goharbor/harbor project's release artifacts?
-          # For a starting point, I might use ghcr.io/<your-username>/harbor for testing in your fork.
-          # ✅ CHANGE TO: ghcr.io/goharbor/harbor-signatures (confirm with vadim)
-          COSIGN_REPOSITORY: ghcr.io/aloui-ikram/harbor-signatures
 
-
-      - name: Sign Online Installer with Cosign  # ✅ KEEP (with repo change)
+      - name: Sign Online Installer with Cosign 
         run: |
           cd src/github.com/goharbor/harbor
           harbor_online_build_bundle=$(ls harbor-online-installer-*.tgz | head -n 1)
           echo "Signing: $harbor_online_build_bundle"
           cosign sign-blob --yes --bundle=${harbor_online_build_bundle}.bundle $harbor_online_build_bundle
-        env:
-          COSIGN_REPOSITORY: ghcr.io/aloui-ikram/harbor-signatures
-      - name: Upload Bundle Files to S3   # ✅ KEEP (THE KEY FIX - without 3rd param)
+
+      - name: Upload Bundle Files to S3 
         run: |
           cd src/github.com/goharbor/harbor
           source tests/ci/build_util.sh
-          
-          # Get the bundle filenames
           harbor_offline_bundle=$(ls harbor-offline-installer-*.tgz.bundle | head -n 1)
           harbor_online_bundle=$(ls harbor-online-installer-*.tgz.bundle | head -n 1)
-          #❌ REMOVE FOR PR - Third parameter
-          # Upload bundles to S3
-          uploader ${harbor_offline_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
-          uploader ${harbor_online_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
-          # ✅ CHANGE TO: Only 2 parameters
-      - name: Upload Signed Artifacts   # ✅ KEEP - Backup to GitHub
+          uploader ${harbor_offline_bundle} ${{ env.harbor_target_bucket }}
+          uploader ${harbor_online_bundle} ${{ env.harbor_target_bucket }}
+          
+      - name: Upload Signed Artifacts   
         uses: actions/upload-artifact@v4
         with:
           name: harbor-signed-installers

@@ -103,9 +103,8 @@ cosign verify-blob \
 
 ## Resources
 
-- [Cosign Documentation](https://docs.sigstore.dev/cosign/overview/)
-- [Harbor Issue #22367](https://github.com/goharbor/harbor/issues/22367)
-- [Sigstore Keyless Signing](https://docs.sigstore.dev/cosign/signing/signing_with_self-managed_keys/)
+- [Cosign Documentation](https://docs.sigstore.dev/)
+- [Harbor Issue #22367](https://github.com/goharbor/harbor/isshttps://www.appvia.io/blog/tutorial-keyless-sign-and-verify-your-container-images)
 - [Harbor Releases](https://github.com/goharbor/harbor/releases)
 
 ---

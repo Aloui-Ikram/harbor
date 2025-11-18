@@ -53,7 +53,7 @@ For learning the architecture design of Harbor, check the document [Architecture
 ## Install & Run
 ### Verifying Release Signatures
 
-Starting with v2.14.0, Harbor release artifacts are cryptographically signed using [Cosign](https://docs.sigstore.dev/cosign/overview/) to ensure authenticity and integrity [[2](https://github.com/sigstore/cosign)][[3](https://docs.sigstore.dev/cosign/verifying/verify/)].
+Starting with v2.14.0, Harbor release artifacts are cryptographically signed using [Cosign](https://docs.sigstore.dev/) to ensure authenticity and integrity [[2](https://github.com/sigstore/cosign)][[3](https://docs.sigstore.dev/cosign/verifying/verify/)].
 
 #### Quick Verification
 ```bash
