@@ -34,13 +34,15 @@ jobs:
         with:
           docker_version: 20.10
           docker_channel: stable
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: jitterbit/get-changed-files@v1
         id: changed-files
         with:
           format: space-delimited
           token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/goharbor/harbor
       - name: Install Cosign  
