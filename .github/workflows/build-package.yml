@@ -1,18 +1,19 @@
 name: "Build Package Workflow"
 env:
   DOCKER_COMPOSE_VERSION: 1.23.0
-
+  harbor_target_bucket: ${{ secrets.HARBOR_RELEASE_BUILD }}
 on:
   push:
     branches:
       - main
       - release-*
+      - test-release-feature
 jobs:
   BUILD_PACKAGE:
     env:
         BUILD_PACKAGE: true
     runs-on:
-      - oracle-vm-24cpu-96gb-x86-64
+      - ubuntu-latest
     permissions:
       id-token: write  
       contents: read 
@@ -49,7 +50,8 @@ jobs:
             contains(steps.changed-files.outputs.modified, 'Dockerfile.base') ||
             contains(steps.changed-files.outputs.modified, 'VERSION') ||
             contains(steps.changed-files.outputs.modified, '.buildbaselog') ||
-            github.ref == 'refs/heads/main'
+            github.ref == 'refs/heads/main' ||
+            github.ref == 'refs/heads/test-release-feature'
         run: |
           set -x
           echo "BUILD_BASE=true" >> $GITHUB_ENV
@@ -75,7 +77,7 @@ jobs:
             harbor_target_bucket=$harbor_builds_bucket
           else
             Harbor_Assets_Version=$target_release_version
-            harbor_target_bucket=$harbor_releases_bucket/$target_branch
+            harbor_target_bucket="aloui-ikram-harbor-artifacts-2025/${target_branch}"
           fi
 
           if [[ $target_branch == "release-"* ]]; then
@@ -84,16 +86,26 @@ jobs:
             Harbor_Build_Base_Tag=dev
           fi
 
+          # build_base_params=" BUILD_BASE=false"
+          # cd src/github.com/goharbor/harbor
+          # if [ -z "$BUILD_BASE"  ] || [ "$BUILD_BASE" != "true"  ]; then
+          #   echo "Do not need to build base images!"
+          # else
+          #   build_base_params=" BUILD_BASE=true PULL_BASE_FROM_DOCKERHUB=true PUSHBASEIMAGE=true REGISTRYUSER=\"${{ secrets.DOCKER_HUB_USERNAME }}\" REGISTRYPASSWORD=\"${{ secrets.DOCKER_HUB_PASSWORD }}\""
+          # fi
+          DOCKER_NAMESPACE="${{ secrets.DOCKER_HUB_USERNAME }}"
           build_base_params=" BUILD_BASE=false"
           cd src/github.com/goharbor/harbor
           if [ -z "$BUILD_BASE"  ] || [ "$BUILD_BASE" != "true"  ]; then
             echo "Do not need to build base images!"
           else
-            build_base_params=" BUILD_BASE=true PULL_BASE_FROM_DOCKERHUB=true PUSHBASEIMAGE=true REGISTRYUSER=\"${{ secrets.DOCKER_HUB_USERNAME }}\" REGISTRYPASSWORD=\"${{ secrets.DOCKER_HUB_PASSWORD }}\""
-          fi
+            build_base_params=" BUILD_BASE=true PULL_BASE_FROM_DOCKERHUB=true PUSHBASEIMAGE=true IMAGENAMESPACE=$DOCKER_NAMESPACE BASEIMAGENAMESPACE=$DOCKER_NAMESPACE REGISTRYUSER=\"${{ secrets.DOCKER_HUB_USERNAME }}\" REGISTRYPASSWORD=\"${{ secrets.DOCKER_HUB_PASSWORD }}\""
+          fi 
         
-          sudo make package_offline GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
-          sudo make package_online GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
+          # sudo make package_offline GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
+          # sudo make package_online GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
+          sudo make package_offline GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params} IMAGENAMESPACE=$DOCKER_NAMESPACE BASEIMAGENAMESPACE=$DOCKER_NAMESPACE 
+          sudo make package_online GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params} IMAGENAMESPACE=$DOCKER_NAMESPACE BASEIMAGENAMESPACE=$DOCKER_NAMESPACE
           harbor_offline_build_bundle=$(basename harbor-offline-installer-*.tgz)
           harbor_online_build_bundle=$(basename harbor-online-installer-*.tgz)
           echo "Package name is: $harbor_offline_build_bundle"
@@ -102,14 +114,14 @@ jobs:
           source tests/ci/build_util.sh
           cp ${harbor_offline_build_bundle}                 harbor-offline-installer-latest.tgz
           cp ${harbor_online_build_bundle}                  harbor-online-installer-latest.tgz
-          uploader ${harbor_offline_build_bundle}           $harbor_target_bucket
-          uploader ${harbor_online_build_bundle}            $harbor_target_bucket
-          uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket
-          uploader harbor-online-installer-latest.tgz       $harbor_target_bucket
+          uploader ${harbor_offline_build_bundle}           $harbor_target_bucket  $AWS_REGION
+          uploader ${harbor_online_build_bundle}            $harbor_target_bucket  $AWS_REGION
+          uploader harbor-offline-installer-latest.tgz      $harbor_target_bucket  $AWS_REGION
+          uploader harbor-online-installer-latest.tgz       $harbor_target_bucket  $AWS_REGION
           echo "BUILD_BUNDLE=$harbor_offline_build_bundle" >> $GITHUB_ENV
           echo "harbor_target_bucket=$harbor_target_bucket" >> $GITHUB_ENV
       
-          publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}"
+          publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}" $DOCKER_NAMESPACE
       - name: Sign Offline Installer with Cosign 
         run: |
           cd src/github.com/goharbor/harbor
@@ -130,6 +142,6 @@ jobs:
           source tests/ci/build_util.sh
           harbor_offline_bundle=$(ls harbor-offline-installer-*.tgz.bundle | head -n 1)
           harbor_online_bundle=$(ls harbor-online-installer-*.tgz.bundle | head -n 1)
-          uploader ${harbor_offline_bundle} ${{ env.harbor_target_bucket }}
-          uploader ${harbor_online_bundle} ${{ env.harbor_target_bucket }}
+          uploader ${harbor_offline_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
+          uploader ${harbor_online_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
           

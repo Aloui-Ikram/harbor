@@ -10,7 +10,7 @@ function s3_to_https() {
     local bucket="${BASH_REMATCH[1]}"
     local path="${BASH_REMATCH[2]}"
     # current s3 bucket is create in this region
-    local region="us-west-1"  
+     local region="us-east-1"    
     echo "https://${bucket}.s3.${region}.amazonaws.com/${path}"
   else
     echo "Invalid S3 URL: $s3_url" >&2
@@ -20,10 +20,15 @@ function s3_to_https() {
 
 
 function uploader {
-    converted_url=$(s3_to_https "s3://$2/$1")
+    local file_name="$1"
+    local target_bucket="$2"
+    local aws_region="$3"
+    converted_url=$(s3_to_https "s3://$target_bucket/$file_name")
     echo "download url $converted_url"
-    aws s3 cp $1 s3://$2/$1
+     # <--- CHANGED: Added --region flag
+    aws s3 cp "$file_name" "s3://$target_bucket/$file_name" --region "$aws_region"   
 }
+
 
 function publishImage {
     echo "Publishing images to Docker Hub..."
