@@ -87,7 +87,7 @@ jobs:
       - name: Generate release notes
         run: |
           release_notes_path=$(pwd)/release-notes.txt
-          source tools/release/release_utils.sh && generateReleaseNotes ${{ env.CUR_TAG }} ${{ env.PRE_TAG }} ${{ secrets.GITHUB_TOKEN }} ${{ github.repository }} $release_notes_path
+          source tools/release/release_utils.sh && generateReleaseNotes "${{ env.CUR_TAG }}" "${{ env.PRE_TAG }}" "${{ secrets.GITHUB_TOKEN }}" "${{ github.repository }}" "$release_notes_path"
           echo "RELEASE_NOTES_PATH=$release_notes_path" >> $GITHUB_ENV
       - name: RC Release
         uses: softprops/action-gh-release@v2
