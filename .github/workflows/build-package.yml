@@ -146,4 +146,7 @@ jobs:
           harbor_online_bundle=$(ls harbor-online-installer-*.tgz.bundle | head -n 1)
           uploader ${harbor_offline_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
           uploader ${harbor_online_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
-          
+          cp ${harbor_offline_bundle} harbor-offline-installer-latest.tgz.bundle
+          cp ${harbor_online_bundle} harbor-online-installer-latest.tgz.bundle
+          uploader harbor-offline-installer-latest.tgz.bundle ${{ env.harbor_target_bucket }} $AWS_REGION
+          uploader harbor-online-installer-latest.tgz.bundle ${{ env.harbor_target_bucket }} $AWS_REGION
