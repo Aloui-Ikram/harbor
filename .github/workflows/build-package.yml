@@ -127,14 +127,13 @@ jobs:
       - name: Sign Offline Installer with Cosign 
         run: |
           cd src/github.com/goharbor/harbor
-          harbor_offline_build_bundle=$(ls harbor-offline-installer-*.tgz | head -n 1)
+          harbor_offline_build_bundle=$(ls harbor-offline-installer-*.tgz | grep -v "latest" | head -n 1)
           echo "Signing: $harbor_offline_build_bundle"
           cosign sign-blob --yes --bundle=${harbor_offline_build_bundle}.bundle $harbor_offline_build_bundle
-
       - name: Sign Online Installer with Cosign 
         run: |
           cd src/github.com/goharbor/harbor
-          harbor_online_build_bundle=$(ls harbor-online-installer-*.tgz | head -n 1)
+          harbor_online_build_bundle=$(ls harbor-online-installer-*.tgz | grep -v "latest" | head -n 1)
           echo "Signing: $harbor_online_build_bundle"
           cosign sign-blob --yes --bundle=${harbor_online_build_bundle}.bundle $harbor_online_build_bundle
 
@@ -142,8 +141,8 @@ jobs:
         run: |
           cd src/github.com/goharbor/harbor
           source tests/ci/build_util.sh
-          harbor_offline_bundle=$(ls harbor-offline-installer-*.tgz.bundle | head -n 1)
-          harbor_online_bundle=$(ls harbor-online-installer-*.tgz.bundle | head -n 1)
+          harbor_offline_bundle=$(ls harbor-offline-installer-*.tgz.bundle | grep -v "latest" | head -n 1)
+          harbor_online_bundle=$(ls harbor-online-installer-*.tgz.bundle | grep -v "latest" | head -n 1)
           uploader ${harbor_offline_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
           uploader ${harbor_online_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
           cp ${harbor_offline_bundle} harbor-offline-installer-latest.tgz.bundle
