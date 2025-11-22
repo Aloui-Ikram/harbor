@@ -32,7 +32,8 @@ function generateReleaseNotes {
     # Use .github/release.yml configuration to generate release notes for preTag to curTag
     local curTag=$1
     local preTag=$2
-    local repository=$4  # NEW ARGUMENT
+    local token=$3
+    local repository=$4
     local releaseNotesPath=$5
     set +e
     # Calculate preTag if preTag is null
