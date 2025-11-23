@@ -1,3 +1,4 @@
+
 name: Publish Release
 
 on:
@@ -8,6 +9,8 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:         
+      contents: write     
     steps:
       - uses: actions/checkout@v5
       - name: Setup env
@@ -39,13 +42,11 @@ jobs:
           src_online_package="harbor-online-installer-latest.tgz"
           src_offline_bundle="harbor-offline-installer-latest.tgz.bundle"
           src_online_bundle="harbor-online-installer-latest.tgz.bundle"
-
           # 2. Define Destination filenames (Renamed with the tag for the release)
           dst_offline_package="harbor-offline-installer-${{ env.CUR_TAG }}.tgz"
           dst_online_package="harbor-online-installer-${{ env.CUR_TAG }}.tgz"
           dst_offline_bundle="harbor-offline-installer-${{ env.CUR_TAG }}.tgz.bundle"
           dst_online_bundle="harbor-online-installer-${{ env.CUR_TAG }}.tgz.bundle"
-
           # 3. Determine S3 folder path
           # Defaults to 'test-release-feature' if env.BRANCH is missing
           SEARCH_BRANCH="${{ env.BRANCH }}"
@@ -54,16 +55,13 @@ jobs:
           fi
           
           echo "Downloading assets from Bucket: ${{ secrets.HARBOR_RELEASE_BUILD }} Folder: $SEARCH_BRANCH"
-
           # 4. Download and Rename from S3
           aws s3 cp "s3://${{ secrets.HARBOR_RELEASE_BUILD }}/${SEARCH_BRANCH}/${src_offline_package}" "./${dst_offline_package}"
           aws s3 cp "s3://${{ secrets.HARBOR_RELEASE_BUILD }}/${SEARCH_BRANCH}/${src_online_package}" "./${dst_online_package}"
           aws s3 cp "s3://${{ secrets.HARBOR_RELEASE_BUILD }}/${SEARCH_BRANCH}/${src_offline_bundle}" "./${dst_offline_bundle}"
           aws s3 cp "s3://${{ secrets.HARBOR_RELEASE_BUILD }}/${SEARCH_BRANCH}/${src_online_bundle}" "./${dst_online_bundle}"
-
           # 5. Generate MD5 Checksum
           md5sum $dst_offline_package $dst_online_package > md5sum
-
           # 6. Set Environment Variables for the Upload Step
           assets_path=$(pwd)
           echo "OFFLINE_PACKAGE_PATH=$assets_path/$dst_offline_package" >> $GITHUB_ENV
