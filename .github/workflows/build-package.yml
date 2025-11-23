@@ -37,18 +37,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: jitterbit/get-changed-files@v1
-        id: changed-files
-        with:
-          format: space-delimited
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # - uses: jitterbit/get-changed-files@v1
+      #   id: changed-files
+      #   with:
+      #     format: space-delimited
+      #     token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v4
         with:
           path: src/github.com/goharbor/harbor
       - name: Install Cosign  
         uses: sigstore/cosign-installer@v3.7.0   
       - name: Build Base Image
-        if: |
+        
             contains(steps.changed-files.outputs.modified, 'Dockerfile.base') ||
             contains(steps.changed-files.outputs.modified, 'VERSION') ||
             contains(steps.changed-files.outputs.modified, '.buildbaselog') ||
