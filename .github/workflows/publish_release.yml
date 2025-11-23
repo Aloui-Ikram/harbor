@@ -17,18 +17,16 @@ jobs:
         run: |
           echo "CUR_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
           echo "BASE_TAG=$(cat ./VERSION)" >> $GITHUB_ENV
-          release=$(curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}) || true
-          BRANCH=$(echo "$release" | jq -r '.target_commitish')
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-          JSON_BODY=$(echo "$release" | jq -r '.body')
-          BUILD_NO=$(echo "$JSON_BODY" | jq -r '.buildNo // empty' 2>/dev/null || echo "")
-          PRE_TAG=$(echo "$JSON_BODY" | jq -r '.preTag // empty' 2>/dev/null || echo "")
-          PRERELEASE=$(echo "$release" | jq -r '.prerelease')
-          echo "BUILD_NO=$BUILD_NO" >> $GITHUB_ENV
-          echo "PRE_TAG=$PRE_TAG" >> $GITHUB_ENV
-          echo "PRERELEASE=$PRERELEASE" >> $GITHUB_ENV
           
-          echo "Debug Info: Branch=$BRANCH, Tag=${{ github.ref_name }}"
+          # --- FOR TESTING ONLY ---
+          # i forcefully set the branch to my feature branch so it finds the artifacts
+          echo "BRANCH=test-release-feature" >> $GITHUB_ENV
+          
+          # Mock these values so the workflow doesn't crash looking for a real release
+          echo "BUILD_NO=${{ github.run_number }}" >> $GITHUB_ENV
+          echo "PRE_TAG=v0.0.0" >> $GITHUB_ENV
+          echo "PRERELEASE=true" >> $GITHUB_ENV
+          
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5.0.0
         with:
@@ -37,38 +35,39 @@ jobs:
           aws-region: us-east-1
       - name: Prepare Assets
         run: |
-          # 1. Define Source filenames (The 'latest' files uploaded by build-package.yml)
-          src_offline_package="harbor-offline-installer-latest.tgz"
-          src_online_package="harbor-online-installer-latest.tgz"
-          src_offline_bundle="harbor-offline-installer-latest.tgz.bundle"
-          src_online_bundle="harbor-online-installer-latest.tgz.bundle"
-          # 2. Define Destination filenames (Renamed with the tag for the release)
+          BUCKET_NAME="aloui-ikram-harbor-artifacts-2025"
+          aws s3 ls s3://${BUCKET_NAME}/${{ env.BRANCH }}/ > s3_files.txt
+          src_offline_package=$(grep "harbor-offline-installer" s3_files.txt | grep ".tgz$" | tail -n 1 | awk '{print $4}')
+          src_online_package=$(grep "harbor-online-installer" s3_files.txt | grep ".tgz$" | tail -n 1 | awk '{print $4}')
+          src_offline_bundle="${src_offline_package}.bundle"
+          src_online_bundle="${src_online_package}.bundle"
+          
           dst_offline_package="harbor-offline-installer-${{ env.CUR_TAG }}.tgz"
           dst_online_package="harbor-online-installer-${{ env.CUR_TAG }}.tgz"
-          dst_offline_bundle="harbor-offline-installer-${{ env.CUR_TAG }}.tgz.bundle"
-          dst_online_bundle="harbor-online-installer-${{ env.CUR_TAG }}.tgz.bundle"
-          # 3. Determine S3 folder path
-          # Defaults to 'test-release-feature' if env.BRANCH is missing
-          SEARCH_BRANCH="${{ env.BRANCH }}"
-          if [ -z "$SEARCH_BRANCH" ] || [ "$SEARCH_BRANCH" == "null" ]; then
-             SEARCH_BRANCH="test-release-feature"
-          fi
+          dst_offline_bundle="${dst_offline_package}.bundle"
+          dst_online_bundle="${dst_online_package}.bundle"
           
-          echo "Downloading assets from Bucket: ${{ secrets.HARBOR_RELEASE_BUILD }} Folder: $SEARCH_BRANCH"
-          # 4. Download and Rename from S3
-          aws s3 cp "s3://${{ secrets.HARBOR_RELEASE_BUILD }}/${SEARCH_BRANCH}/${src_offline_package}" "./${dst_offline_package}"
-          aws s3 cp "s3://${{ secrets.HARBOR_RELEASE_BUILD }}/${SEARCH_BRANCH}/${src_online_package}" "./${dst_online_package}"
-          aws s3 cp "s3://${{ secrets.HARBOR_RELEASE_BUILD }}/${SEARCH_BRANCH}/${src_offline_bundle}" "./${dst_offline_bundle}"
-          aws s3 cp "s3://${{ secrets.HARBOR_RELEASE_BUILD }}/${SEARCH_BRANCH}/${src_online_bundle}" "./${dst_online_bundle}"
-          # 5. Generate MD5 Checksum
-          md5sum $dst_offline_package $dst_online_package > md5sum
-          # 6. Set Environment Variables for the Upload Step
-          assets_path=$(pwd)
+          assets_path=$(pwd)/assets
+          mkdir -p $assets_path
+          
+          source tools/release/release_utils.sh
+          aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_offline_package} $assets_path/$dst_offline_package
+          aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_online_package} $assets_path/$dst_online_package
+          aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_offline_bundle} $assets_path/$dst_offline_bundle
+          aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_online_bundle} $assets_path/$dst_online_bundle
+
+          # Generate checksums
+          cd $assets_path
+          md5sum $dst_offline_package > md5sum
+          md5sum $dst_online_package >> md5sum
+          cd ..
+        
           echo "OFFLINE_PACKAGE_PATH=$assets_path/$dst_offline_package" >> $GITHUB_ENV
           echo "ONLINE_PACKAGE_PATH=$assets_path/$dst_online_package" >> $GITHUB_ENV
           echo "OFFLINE_BUNDLE_PATH=$assets_path/$dst_offline_bundle" >> $GITHUB_ENV
           echo "ONLINE_BUNDLE_PATH=$assets_path/$dst_online_bundle" >> $GITHUB_ENV
           echo "MD5SUM_PATH=$assets_path/md5sum" >> $GITHUB_ENV
+          
       - name: Setup Docker
         uses: docker-practice/actions-setup-docker@master
         with:
