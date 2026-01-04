@@ -45,15 +45,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: src/github.com/goharbor/harbor
-      - name: Install Cosign  
-        uses: sigstore/cosign-installer@v3.7.0   
+
       - name: Build Base Image
-        
-            contains(steps.changed-files.outputs.modified, 'Dockerfile.base') ||
-            contains(steps.changed-files.outputs.modified, 'VERSION') ||
-            contains(steps.changed-files.outputs.modified, '.buildbaselog') ||
-            github.ref == 'refs/heads/main' ||
-            github.ref == 'refs/heads/test-release-feature'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test-release-feature'
         run: |
           set -x
           echo "BUILD_BASE=true" >> $GITHUB_ENV
@@ -124,25 +118,3 @@ jobs:
           echo "harbor_target_bucket=$harbor_target_bucket" >> $GITHUB_ENV
       
           publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}" $DOCKER_NAMESPACE
-      - name: Sign Offline Installer with Cosign 
-        run: |
-          cd src/github.com/goharbor/harbor
-          harbor_offline_build_bundle=$(ls harbor-offline-installer-*.tgz | grep -v "latest" | head -n 1)
-          echo "Signing: $harbor_offline_build_bundle"
-          cosign sign-blob --yes --bundle=${harbor_offline_build_bundle}.bundle $harbor_offline_build_bundle
-      - name: Sign Online Installer with Cosign 
-        run: |
-          cd src/github.com/goharbor/harbor
-          harbor_online_build_bundle=$(ls harbor-online-installer-*.tgz | grep -v "latest" | head -n 1)
-          echo "Signing: $harbor_online_build_bundle"
-          cosign sign-blob --yes --bundle=${harbor_online_build_bundle}.bundle $harbor_online_build_bundle
-
-      - name: Upload Bundle Files to S3 
-        run: |
-          cd src/github.com/goharbor/harbor
-          source tests/ci/build_util.sh
-          harbor_offline_bundle=$(ls harbor-offline-installer-*.tgz.bundle | grep -v "latest" | head -n 1)
-          harbor_online_bundle=$(ls harbor-online-installer-*.tgz.bundle | grep -v "latest" | head -n 1)
-          uploader ${harbor_offline_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
-          uploader ${harbor_online_bundle} ${{ env.harbor_target_bucket }} $AWS_REGION
-          
