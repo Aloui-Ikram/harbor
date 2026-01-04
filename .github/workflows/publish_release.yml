@@ -10,7 +10,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:         
-      contents: write     
+      contents: write
+      id-token: write     
     steps:
       - uses: actions/checkout@v5
       - name: Setup env
@@ -36,27 +37,20 @@ jobs:
       - name: Prepare Assets
         run: |
           BUCKET_NAME="aloui-ikram-harbor-artifacts-2025"
+          
           aws s3 ls s3://${BUCKET_NAME}/${{ env.BRANCH }}/ > s3_files.txt
-          src_offline_package=$(grep "harbor-offline-installer" s3_files.txt | grep ".tgz$" | tail -n 1 | awk '{print $4}')
-          src_online_package=$(grep "harbor-online-installer" s3_files.txt | grep ".tgz$" | tail -n 1 | awk '{print $4}')
-          src_offline_bundle="${src_offline_package}.bundle"
-          src_online_bundle="${src_online_package}.bundle"
+          src_offline_package=$(grep "harbor-offline-installer" s3_files.txt | grep -v "latest" | grep ".tgz$" | tail -n 1 | awk '{print $4}')
+          src_online_package=$(grep "harbor-online-installer" s3_files.txt | grep -v "latest" | grep ".tgz$" | tail -n 1 | awk '{print $4}')
           
           dst_offline_package="harbor-offline-installer-${{ env.CUR_TAG }}.tgz"
           dst_online_package="harbor-online-installer-${{ env.CUR_TAG }}.tgz"
-          dst_offline_bundle="${dst_offline_package}.bundle"
-          dst_online_bundle="${dst_online_package}.bundle"
           
           assets_path=$(pwd)/assets
           mkdir -p $assets_path
           
-          source tools/release/release_utils.sh
           aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_offline_package} $assets_path/$dst_offline_package
           aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_online_package} $assets_path/$dst_online_package
-          aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_offline_bundle} $assets_path/$dst_offline_bundle
-          aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_online_bundle} $assets_path/$dst_online_bundle
 
-          # Generate checksums
           cd $assets_path
           md5sum $dst_offline_package > md5sum
           md5sum $dst_online_package >> md5sum
@@ -64,10 +58,19 @@ jobs:
         
           echo "OFFLINE_PACKAGE_PATH=$assets_path/$dst_offline_package" >> $GITHUB_ENV
           echo "ONLINE_PACKAGE_PATH=$assets_path/$dst_online_package" >> $GITHUB_ENV
-          echo "OFFLINE_BUNDLE_PATH=$assets_path/$dst_offline_bundle" >> $GITHUB_ENV
-          echo "ONLINE_BUNDLE_PATH=$assets_path/$dst_online_bundle" >> $GITHUB_ENV
           echo "MD5SUM_PATH=$assets_path/md5sum" >> $GITHUB_ENV
-          
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.7.0
+      - name: Sign Release Artifacts
+        run: |
+          cosign sign-blob --yes \
+            --bundle=./assets/harbor-offline-installer-${{ env.CUR_TAG }}.tgz.sigstore.json \
+            ${{ env.OFFLINE_PACKAGE_PATH }}
+          cosign sign-blob --yes \
+            --bundle=./assets/harbor-online-installer-${{ env.CUR_TAG }}.tgz.sigstore.json \
+            ${{ env.ONLINE_PACKAGE_PATH }}
+          echo "OFFLINE_BUNDLE_PATH=./assets/harbor-offline-installer-${{ env.CUR_TAG }}.tgz.sigstore.json" >> $GITHUB_ENV
+          echo "ONLINE_BUNDLE_PATH=./assets/harbor-online-installer-${{ env.CUR_TAG }}.tgz.sigstore.json" >> $GITHUB_ENV      
       - name: Setup Docker
         uses: docker-practice/actions-setup-docker@master
         with:
