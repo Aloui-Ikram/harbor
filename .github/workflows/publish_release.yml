@@ -44,21 +44,22 @@ jobs:
           
           dst_offline_package="harbor-offline-installer-${{ env.CUR_TAG }}.tgz"
           dst_online_package="harbor-online-installer-${{ env.CUR_TAG }}.tgz"
-          
-          assets_path=$(pwd)/assets
-          mkdir -p $assets_path
-          
-          aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_offline_package} $assets_path/$dst_offline_package
-          aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_online_package} $assets_path/$dst_online_package
+          # 3. Rename/Copy in S3 (Critical for getAssets to work)
+          aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_offline_package} s3://${BUCKET_NAME}/${{ env.BRANCH }}/${dst_offline_package}
+          aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_online_package} s3://${BUCKET_NAME}/${{ env.BRANCH }}/${dst_online_package}
 
-          cd $assets_path
-          md5sum $dst_offline_package > md5sum
-          md5sum $dst_online_package >> md5sum
-          cd ..
-        
+          # 4. use getAssets 
+          assets_path=$(pwd)/assets
+          source tools/release/release_utils.sh
+          
+          # We pass the bucket name and my specific variables here
+          getAssets ${BUCKET_NAME} ${{ env.BRANCH }} $dst_offline_package $dst_online_package ${{ env.PRERELEASE }} $assets_path
+          
+          # 5. Export paths
           echo "OFFLINE_PACKAGE_PATH=$assets_path/$dst_offline_package" >> $GITHUB_ENV
           echo "ONLINE_PACKAGE_PATH=$assets_path/$dst_online_package" >> $GITHUB_ENV
-          echo "MD5SUM_PATH=$assets_path/md5sum" >> $GITHUB_ENV
+          echo "MD5SUM_PATH=$assets_path/md5sum" >> $GITHUB_ENV    
+         
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.7.0
       - name: Sign Release Artifacts
