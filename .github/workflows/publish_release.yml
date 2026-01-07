@@ -36,29 +36,33 @@ jobs:
           aws-region: us-east-1
       - name: Prepare Assets
         run: |
+          # Use your custom bucket
           BUCKET_NAME="aloui-ikram-harbor-artifacts-2025"
           
+          # Find the latest build artifacts in S3
           aws s3 ls s3://${BUCKET_NAME}/${{ env.BRANCH }}/ > s3_files.txt
           src_offline_package=$(grep "harbor-offline-installer" s3_files.txt | grep -v "latest" | grep ".tgz$" | tail -n 1 | awk '{print $4}')
           src_online_package=$(grep "harbor-online-installer" s3_files.txt | grep -v "latest" | grep ".tgz$" | tail -n 1 | awk '{print $4}')
           
+          # Create target filenames
           dst_offline_package="harbor-offline-installer-${{ env.CUR_TAG }}.tgz"
           dst_online_package="harbor-online-installer-${{ env.CUR_TAG }}.tgz"
-          # 3. Rename/Copy in S3 (Critical for getAssets to work)
+          
+          # Copy to new names in S3 (so getAssets can find them)
           aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_offline_package} s3://${BUCKET_NAME}/${{ env.BRANCH }}/${dst_offline_package}
           aws s3 cp s3://${BUCKET_NAME}/${{ env.BRANCH }}/${src_online_package} s3://${BUCKET_NAME}/${{ env.BRANCH }}/${dst_online_package}
 
-          # 4. use getAssets 
+          # Use getAssets function from release_utils.sh
           assets_path=$(pwd)/assets
           source tools/release/release_utils.sh
           
-          # We pass the bucket name and my specific variables here
-          getAssets ${BUCKET_NAME} ${{ env.BRANCH }} $dst_offline_package $dst_online_package ${{ env.PRERELEASE }} $assets_path
+          # Call getAssets with correct parameters
+          getAssets "${BUCKET_NAME}" "${{ env.BRANCH }}" "${dst_offline_package}" "${dst_online_package}" "${{ env.PRERELEASE }}" "${assets_path}"
           
-          # 5. Export paths
+          # Export environment variables for later steps
           echo "OFFLINE_PACKAGE_PATH=$assets_path/$dst_offline_package" >> $GITHUB_ENV
           echo "ONLINE_PACKAGE_PATH=$assets_path/$dst_online_package" >> $GITHUB_ENV
-          echo "MD5SUM_PATH=$assets_path/md5sum" >> $GITHUB_ENV    
+          echo "MD5SUM_PATH=$assets_path/md5sum" >> $GITHUB_ENV   
          
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.7.0

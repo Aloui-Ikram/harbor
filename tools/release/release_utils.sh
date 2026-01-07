@@ -8,14 +8,21 @@ function getAssets {
     local onlinePackage=$4
     local prerelease=$5
     local assetsPath=$6
-    
+
     mkdir $assetsPath && pushd $assetsPath
     aws s3 cp s3://$bucket/$branch/$offlinePackage .
     md5sum $offlinePackage > md5sum
-    
-    if [ "$prerelease" = "false" ]; then
+    if [ -n "$offlineBundle" ]; then
+        aws s3 cp s3://$bucket/$branch/$offlineBundle .
+    fi
+    # Pre-release does not handle online installer packages
+    if [ $prerelease = "false" ]
+    then
         aws s3 cp s3://$bucket/$branch/$onlinePackage .
         md5sum $onlinePackage >> md5sum
+        if [ -n "$onlineBundle" ]; then
+            aws s3 cp s3://$bucket/$branch/$onlineBundle .
+        fi
     fi
     popd
 }
@@ -25,7 +32,8 @@ function generateReleaseNotes {
     local curTag=$1
     local preTag=$2
     local token=$3
-    local releaseNotesPath=$4
+    local repository=$4
+    local releaseNotesPath=$5
     set +e
     # Calculate preTag if preTag is null
     # If curTag is v2.5.0-rc1 then preTag is v2.4.0
@@ -45,7 +53,7 @@ function generateReleaseNotes {
         fi
     fi
     set -e
-    release=$(curl -X POST -H "Authorization: token $token" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/goharbor/harbor/releases/generate-notes -d '{"tag_name":"'$curTag'","previous_tag_name":"'$preTag'"}' | jq '.body' | tr -d '"')
+    release=$(curl -X POST -H "Authorization: token $token" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$repository/releases/generate-notes -d '{"tag_name":"'$curTag'","previous_tag_name":"'$preTag'"}' | jq '.body' | tr -d '"')
     echo -e $release > $releaseNotesPath
 }
 
